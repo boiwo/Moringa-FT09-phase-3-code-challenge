@@ -1,33 +1,65 @@
-from database.connection import get_db_connection
-from models.author import Author
-from models.magazine import Magazine
-
 class Article:
-    def __init__(self, id, title, author, magazine):
-        self._id = id
+    def __init__(self,id=None, title=None, content=None, author=None, magazine=None,conn = None,author_id=None,magazine_id=None):
+        self.id = id
         self.title = title
-        self.author = author
-        self.magazine = magazine
+        self.content = content
+        self.author_id = author_id if author_id else author.id
+        self.magazine_id = magazine_id if magazine_id else magazine.id
+        self.conn = conn
 
-    @property
-    def id(self):
-        return self._id
+        if conn:
+            self.cursor = self.conn.cursor()
+            self.add_to_database()
+
+    def __repr__(self):
+        return f'<Article {self.title}>'
     
-    @id.setter
-    def id(self, value):
-        if not isinstance(value, int):
-            raise ValueError("Id must be an integer.")
-        self._id = value
+
+    def add_to_database(self):
+        sql = "INSERT INTO articles (title,content,author_id,magazine_id) VALUES (?,?,?,?)"
+        self.cursor.execute(sql,(self.title,self.content,self.author_id,self.magazine_id))
+        self.conn.commit()
+        self.id = self.cursor.lastrowid
 
     @property
     def title(self):
+        if not hasattr(self,"_title"):
+            sql = "SELECT title FROM articles WHERE id = ?"
+            row = self.cursor.execute(sql,(self.id,)).fetchone()
+            if row:
+                self._title = row[0]
         return self._title
-
+        
     @title.setter
-    def title(self, value):
-        if not isinstance(value, str) or not (1 <= len(value) <= 50):
-            raise ValueError("Title must be a string between 1 and 50 characters.")
-        self._title = value
+    def title(self,title):
+        if isinstance(title,str) and 5 <= len(title) <= 50 and not hasattr(self,"_title") :
+            self._title = title
+        else:
+            raise ValueError("Title must be a string between 5 and 50 characters long and can only be set once.")
 
-    def __repr__(self):
-        return f"Article(title='{self.title}', author={self.author}, magazine={self.magazine})"
+    def author(self):
+        from models.author import Author
+        sql = "SELECT authors.* FROM articles INNER JOIN authors ON articles.author_id = authors.id WHERE articles.id = ?"
+        row = self.cursor.execute(sql,(self.id,)).fetchone()
+        if row:
+            return Author(id=row[0], name=row[1], conn=self.conn)
+        else:
+            return None
+
+    
+    def magazine(self):
+        from models.magazine import Magazine
+        sql = "SELECT magazines.* FROM articles INNER JOIN magazines ON articles.magazine_id = magazines.id WHERE articles.id = ?"
+        row = self.cursor.execute(sql,(self.id,)).fetchone()
+        if row:
+            return Magazine(id=row[0],name=row[1],category=row[2],conn=self.conn)
+        else:
+            return None
+
+
+    @classmethod
+    def get_all_articles(cls,conn):
+        sql = "SELECT * FROM articles"
+        cursor = conn.cursor()
+        articles = cursor.execute(sql).fetchall()
+        return [cls(id=row[0],title=row[1],content=row[2],author_id=row[3],magazine_id=row[4],conn=conn) for row in articles]
