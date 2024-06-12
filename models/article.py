@@ -1,65 +1,55 @@
 class Article:
-    def __init__(self,id=None, title=None, content=None, author=None, magazine=None,conn = None,author_id=None,magazine_id=None):
-        self.id = id
+    def __init__(self, id, title, content, author_id, magazine_id):
+        self._id = id
         self.title = title
         self.content = content
-        self.author_id = author_id if author_id else author.id
-        self.magazine_id = magazine_id if magazine_id else magazine.id
-        self.conn = conn
+        self._author_id = author_id
+        self._magazine_id = magazine_id
 
-        if conn:
-            self.cursor = self.conn.cursor()
-            self.add_to_database()
-
-    def __repr__(self):
-        return f'<Article {self.title}>'
-    
-
-    def add_to_database(self):
-        sql = "INSERT INTO articles (title,content,author_id,magazine_id) VALUES (?,?,?,?)"
-        self.cursor.execute(sql,(self.title,self.content,self.author_id,self.magazine_id))
-        self.conn.commit()
-        self.id = self.cursor.lastrowid
+    @property
+    def id(self):
+        return self._id
 
     @property
     def title(self):
-        if not hasattr(self,"_title"):
-            sql = "SELECT title FROM articles WHERE id = ?"
-            row = self.cursor.execute(sql,(self.id,)).fetchone()
-            if row:
-                self._title = row[0]
         return self._title
-        
+
     @title.setter
-    def title(self,title):
-        if isinstance(title,str) and 5 <= len(title) <= 50 and not hasattr(self,"_title") :
-            self._title = title
+    def title(self, value):
+        if isinstance(value, str) and 5 <= len(value) <= 50:
+            self._title = value
         else:
-            raise ValueError("Title must be a string between 5 and 50 characters long and can only be set once.")
-
-    def author(self):
-        from models.author import Author
-        sql = "SELECT authors.* FROM articles INNER JOIN authors ON articles.author_id = authors.id WHERE articles.id = ?"
-        row = self.cursor.execute(sql,(self.id,)).fetchone()
-        if row:
-            return Author(id=row[0], name=row[1], conn=self.conn)
-        else:
-            return None
-
-    
-    def magazine(self):
-        from models.magazine import Magazine
-        sql = "SELECT magazines.* FROM articles INNER JOIN magazines ON articles.magazine_id = magazines.id WHERE articles.id = ?"
-        row = self.cursor.execute(sql,(self.id,)).fetchone()
-        if row:
-            return Magazine(id=row[0],name=row[1],category=row[2],conn=self.conn)
-        else:
-            return None
-
+            raise ValueError("Title must be a string between 5 and 50 characters")
 
     @classmethod
-    def get_all_articles(cls,conn):
-        sql = "SELECT * FROM articles"
-        cursor = conn.cursor()
-        articles = cursor.execute(sql).fetchall()
-        return [cls(id=row[0],title=row[1],content=row[2],author_id=row[3],magazine_id=row[4],conn=conn) for row in articles]
+       
+    def create_article(cls, cursor, title, content, author_id, magazine_id):
+        cursor.execute("INSERT INTO articles (title, content, author_id, magazine_id) VALUES (?, ?, ?, ?)", (title, content, author_id, magazine_id))
+        article_id = cursor.lastrowid
+        return cls(article_id, title, content, author_id, magazine_id)
+
+    @classmethod
+        
+    def get_title(cls, cursor):
+        cursor.execute("SELECT title FROM articles")
+        titles = cursor.fetchall()
+        return [title[0] for title in titles] if titles else None
+
+
+    def get_author(self, cursor):
+         
+        cursor.execute("SELECT name FROM authors WHERE id = ?", (self._author_id,))
+        author_name = cursor.fetchone()
+        return author_name[0] if author_name else None
+
+
+    def get_magazine(self, cursor):
+        
+        cursor.execute("SELECT name FROM magazines WHERE id = ?", (self._magazine_id,))
+        magazine_name = cursor.fetchone()
+        return magazine_name[0] if magazine_name else None
+
+
+
+
+
